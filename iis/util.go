@@ -101,7 +101,7 @@ func fetchBody(res *http.Response) ([]byte, error) {
 }
 
 func guardStatusCode(method string, url *url.URL, response *http.Response) error {
-	if response.StatusCode < 200 || response.StatusCode > 400 {
+	if response.StatusCode < 200 || response.StatusCode >= 400 {
 		var body string
 		if buffer, err := fetchBody(response); err == nil {
 			body = string(buffer[:])
