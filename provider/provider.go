@@ -30,7 +30,8 @@ func Provider() *schema.Provider {
 			"iis_website":          resourceWebsite(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-			"iis_website": dataSourceIisWebsite(),
+			"iis_website":      dataSourceIisWebsite(),
+			"iis_certificates": dataSourceIisCertificates(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
