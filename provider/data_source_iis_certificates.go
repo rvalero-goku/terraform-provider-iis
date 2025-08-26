@@ -20,28 +20,30 @@ func dataSourceIisCertificates() *schema.Resource {
 		ReadContext: dataSourceIisCertificatesRead,
 		Schema: map[string]*schema.Schema{
 			"certificates": {
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Computed: true,
-				Elem: map[string]*schema.Schema{
-					AliasKey: {
-						Type:     schema.TypeString,
-						Required: true,
-					},
-					IdKey: {
-						Type:     schema.TypeString,
-						Required: true,
-					},
-					IssuedByKey: {
-						Type:     schema.TypeString,
-						Required: true,
-					},
-					SubjectKey: {
-						Type:     schema.TypeString,
-						Optional: true,
-					},
-					ThumbprintKey: {
-						Type:     schema.TypeString,
-						Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						AliasKey: {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						IdKey: {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						IssuedByKey: {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						SubjectKey: {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						ThumbprintKey: {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
 					},
 				},
 			},
