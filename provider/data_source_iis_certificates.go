@@ -69,16 +69,21 @@ func dataSourceIisCertificatesRead(ctx context.Context, d *schema.ResourceData, 
 }
 
 func mapCertificatesToSet(certificates []iis.Certificate) *schema.Set {
-	result := schema.NewSet(schema.HashString, []interface{}{})
+	var set []interface{}
 	for _, certificate := range certificates {
-		mapped := map[string]interface{}{
+		set = append(set, map[string]interface{}{
 			AliasKey:      certificate.Alias,
 			IdKey:         certificate.ID,
 			IssuedByKey:   certificate.IssuedBy,
 			SubjectKey:    certificate.Subject,
 			ThumbprintKey: certificate.Thumbprint,
-		}
-		result.Add(mapped)
+		})
 	}
-	return result
+	return schema.NewSet(hashCertificate, set)
+}
+
+func hashCertificate(v interface{}) int {
+	certificateMap := v.(map[string]interface{})
+
+	return schema.HashString(certificateMap[IdKey].(string))
 }
