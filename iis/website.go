@@ -9,8 +9,13 @@ type Website struct {
 }
 
 type WebsiteBinding struct {
-	Protocol  string `json:"protocol"`
-	Port      int    `json:"port"`
-	IPAddress string `json:"ip_address"`
-	Hostname  string `json:"hostname"`
+	Protocol    string             `json:"protocol"`
+	Port        int                `json:"port"`
+	IPAddress   string             `json:"ip_address"`
+	Hostname    string             `json:"hostname"`
+	Certificate BindingCertificate `json:"certificate"`
+}
+
+type BindingCertificate struct {
+	ID string `json:"id"`
 }

@@ -18,6 +18,7 @@ const bindingProtocolKey = "protocol"
 const bindingPortKey = "port"
 const bindingAddressKey = "ip_address"
 const bindingHostKey = "hostname"
+const bindingCertificateId = "certificate"
 
 func resourceWebsite() *schema.Resource {
 	return &schema.Resource{
@@ -67,6 +68,10 @@ var bindingSchema = &schema.Resource{
 			Optional: true,
 		},
 		bindingHostKey: {
+			Type:     schema.TypeString,
+			Optional: true,
+		},
+		bindingCertificateId: {
 			Type:     schema.TypeString,
 			Optional: true,
 		},
@@ -149,12 +154,16 @@ func getBindings(b *schema.Set) []iis.WebsiteBinding {
 		port := binding[bindingPortKey].(int)
 		ipAddress := binding[bindingAddressKey].(string)
 		hostname := binding[bindingHostKey].(string)
+		id := binding[bindingCertificateId].(string)
 
 		bindings[i] = iis.WebsiteBinding{
 			Port:      port,
 			IPAddress: ipAddress,
 			Hostname:  hostname,
 			Protocol:  protocol,
+			Certificate: iis.BindingCertificate{
+				ID: id,
+			},
 		}
 	}
 
@@ -165,10 +174,11 @@ func mapBindingsToSet(site *iis.Website) *schema.Set {
 	var bindings []interface{}
 	for _, binding := range site.Bindings {
 		bindings = append(bindings, map[string]interface{}{
-			bindingProtocolKey: binding.Protocol,
-			bindingAddressKey:  binding.IPAddress,
-			bindingPortKey:     binding.Port,
-			bindingHostKey:     binding.Hostname,
+			bindingProtocolKey:   binding.Protocol,
+			bindingAddressKey:    binding.IPAddress,
+			bindingPortKey:       binding.Port,
+			bindingHostKey:       binding.Hostname,
+			bindingCertificateId: binding.Certificate.ID,
 		})
 	}
 	set := schema.NewSet(hashBinding, bindings)
@@ -181,6 +191,7 @@ func hashBinding(v interface{}) int {
 	protocol := schema.HashString(bindingMap[bindingProtocolKey].(string))
 	port := schema.HashInt(bindingMap[bindingPortKey].(int))
 	hostname := schema.HashString(bindingMap[bindingHostKey].(string))
+	certificateId := schema.HashString(bindingMap[bindingCertificateId].(string))
 
-	return address + protocol + port + hostname
+	return address + protocol + port + hostname + certificateId
 }
