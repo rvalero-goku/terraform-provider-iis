@@ -84,8 +84,66 @@ provider "iis" {
 
 The configuration creates:
 - An IIS Application Pool with .NET Framework v4.0
-- An IIS Website using the application pool
-- Outputs with resource information
+- An IIS Website with HTTP binding
+- Example HTTPS binding configuration (commented out)
+
+### HTTP Binding
+
+The basic example creates a website with an HTTP binding on port 8080:
+
+```hcl
+resource "iis_website" "ntlm_test" {
+  name             = "NTLM Test Website"
+  physical_path    = "C:\\inetpub\\wwwroot"
+  application_pool = iis_application_pool.ntlm_test.id
+
+  binding {
+    protocol   = "http"
+    port       = 8080
+    ip_address = "*"
+    hostname   = ""
+  }
+}
+```
+
+### HTTPS Binding with SSL Certificate
+
+To create an HTTPS binding, you need to reference a certificate. The example includes a data source to list available certificates:
+
+```hcl
+# Fetch available certificates
+data "iis_certificates" "available" {}
+
+resource "iis_website" "https_example" {
+  name             = "HTTPS Example Website"
+  physical_path    = "C:\\inetpub\\wwwroot"
+  application_pool = iis_application_pool.ntlm_test.id
+
+  # HTTP binding
+  binding {
+    protocol   = "http"
+    port       = 80
+    ip_address = "*"
+    hostname   = "example.com"
+  }
+
+  # HTTPS binding with certificate
+  binding {
+    protocol    = "https"
+    port        = 443
+    ip_address  = "*"
+    hostname    = "example.com"
+    certificate = "YOUR_CERTIFICATE_ID_HERE"
+  }
+}
+```
+
+The certificate ID can be obtained from:
+1. The `available_certificates` output after running `terraform apply`
+2. Directly from the IIS Administration API at `/api/certificates`
+3. Using the certificate's thumbprint to find the ID
+
+**Note:** Certificates must already exist on the IIS server in one of the certificate stores (My, WebHosting, or IIS Central Certificate Store). The provider currently supports referencing existing certificates, not creating new ones.
 
 ## Troubleshooting
 

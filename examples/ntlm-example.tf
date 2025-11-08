@@ -78,12 +78,16 @@ provider "iis" {
 #
 # Then use: provider "iis" {}
 
+# Data source to fetch available certificates
+data "iis_certificates" "available" {}
+
 # Test resources
 resource "iis_application_pool" "ntlm_test" {
   name                    = "NTLMTestAppPool"
   managed_runtime_version = "v4.0"
 }
 
+# Example 1: HTTP-only website
 resource "iis_website" "ntlm_test" {
   name             = "NTLM Test Website"
   physical_path    = "C:\\inetpub\\wwwroot"
@@ -97,7 +101,48 @@ resource "iis_website" "ntlm_test" {
   }
 }
 
+# Example 2: HTTPS website with certificate
+# To use this, uncomment and update the certificate reference
+# resource "iis_website" "https_example" {
+#   name             = "HTTPS Example Website"
+#   physical_path    = "C:\\inetpub\\wwwroot"
+#   application_pool = iis_application_pool.ntlm_test.id
+#
+#   # HTTP binding (redirect to HTTPS in production)
+#   binding {
+#     protocol   = "http"
+#     port       = 80
+#     ip_address = "*"
+#     hostname   = "example.com"
+#   }
+#
+#   # HTTPS binding with certificate
+#   binding {
+#     protocol    = "https"
+#     port        = 443
+#     ip_address  = "*"
+#     hostname    = "example.com"
+#     # Use certificate ID from the data source
+#     # Find the desired certificate from: data.iis_certificates.available.certificates
+#     # Example: certificate = tolist(data.iis_certificates.available.certificates)[0].id
+#     certificate = "YOUR_CERTIFICATE_ID_HERE"
+#   }
+# }
+
 # Outputs
+output "available_certificates" {
+  value = [
+    for cert in data.iis_certificates.available.certificates : {
+      id         = cert.id
+      alias      = cert.alias
+      subject    = cert.subject
+      issued_by  = cert.issued_by
+      thumbprint = cert.thumbprint
+    }
+  ]
+  description = "List of available certificates on the IIS server"
+}
+
 output "app_pool_info" {
   value = {
     id   = iis_application_pool.ntlm_test.id

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 func getJson(ctx context.Context, client Client, path string, r interface{}) error {
@@ -93,14 +94,53 @@ func buildRequest(ctx context.Context, client Client, method, path string, body 
 }
 
 func executeRequest(client Client, req *http.Request) (*http.Response, error) {
-	response, err := client.HttpClient.Do(req)
-	if err != nil {
-		return nil, err
+	// Retry configuration for NTLM authentication issues
+	const maxRetries = 3
+	const initialBackoff = 500 * time.Millisecond
+	
+	var response *http.Response
+	var err error
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 500ms, 1s, 2s
+			backoff := initialBackoff * time.Duration(1<<uint(attempt-1))
+			time.Sleep(backoff)
+		}
+		
+		response, err = client.HttpClient.Do(req)
+		if err != nil {
+			// Network errors - retry
+			if attempt < maxRetries-1 {
+				continue
+			}
+			return nil, err
+		}
+		
+		// Check if we should retry based on status code
+		if shouldRetry(response.StatusCode) && attempt < maxRetries-1 {
+			// Close the response body before retrying
+			if response.Body != nil {
+				response.Body.Close()
+			}
+			continue
+		}
+		
+		// Success or non-retryable error
+		break
 	}
+	
 	if err := guardStatusCode(req.Method, req.URL, response); err != nil {
 		return nil, err
 	}
 	return response, err
+}
+
+// shouldRetry determines if a request should be retried based on status code
+func shouldRetry(statusCode int) bool {
+	// Retry on authentication failures (401), server errors (5xx), and too many requests (429)
+	// These are common with NTLM authentication issues and transient server problems
+	return statusCode == 401 || statusCode == 429 || (statusCode >= 500 && statusCode < 600)
 }
 
 func request(ctx context.Context, client Client, method, path string, body interface{}) (*http.Response, error) {

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -120,6 +121,12 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	// Configure proxy if provided
 	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
+		// Connection pool settings to improve NTLM performance
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+		// Enable keep-alive for better NTLM session persistence
+		DisableKeepAlives: false,
 	}
 
 	proxyURL := d.Get("proxy_url").(string)
@@ -149,6 +156,9 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	client := &iis.Client{
 		HttpClient: http.Client{
 			Transport: loggingTransport,
+			// Set reasonable timeout to prevent hanging on auth issues
+			// This timeout applies to the entire request-response cycle
+			Timeout: 30 * time.Second,
 		},
 		Host:         host,
 		AccessKey:    accessKey,
