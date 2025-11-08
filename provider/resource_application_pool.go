@@ -29,6 +29,12 @@ func resourceApplicationPool() *schema.Resource {
 				Optional: true,
 				Default:  "started",
 			},
+			"managed_runtime_version": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "v4.0",
+				Description: ".NET CLR version for the app pool (e.g., v4.0, v2.0)",
+			},
 		},
 	}
 }
@@ -36,8 +42,9 @@ func resourceApplicationPool() *schema.Resource {
 func resourceApplicationPoolCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*iis.Client)
 	name := d.Get(NameKey).(string)
-	tflog.Debug(ctx, "Creating application pool: "+toJSON(name))
-	pool, err := client.CreateAppPool(ctx, name)
+	runtimeVersion := d.Get("managed_runtime_version").(string)
+	tflog.Debug(ctx, "Creating application pool: "+toJSON(name)+", runtime: "+runtimeVersion)
+	pool, err := client.CreateAppPool(ctx, name, runtimeVersion)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -56,21 +63,25 @@ func resourceApplicationPoolRead(ctx context.Context, d *schema.ResourceData, m 
 	}
 	tflog.Debug(ctx, "Read application pool: "+toJSON(appPool))
 
-	if err = d.Set(NameKey, appPool.Name); err != nil {
-		return diag.FromErr(err)
-	}
-	if err = d.Set(StatusKey, appPool.Status); err != nil {
-		return diag.FromErr(err)
-	}
+       if err = d.Set(NameKey, appPool.Name); err != nil {
+	       return diag.FromErr(err)
+       }
+       if err = d.Set(StatusKey, appPool.Status); err != nil {
+	       return diag.FromErr(err)
+       }
+       if err = d.Set("managed_runtime_version", appPool.ManagedRuntimeVersion); err != nil {
+	       return diag.FromErr(err)
+       }
 	return nil
 }
 
 func resourceApplicationPoolUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*iis.Client)
-	if d.HasChange(NameKey) {
+	if d.HasChange(NameKey) || d.HasChange("managed_runtime_version") {
 		name := d.Get(NameKey).(string)
-		tflog.Debug(ctx, "Updating application pool: "+toJSON(name))
-		applicationPool, err := client.UpdateAppPool(ctx, d.Id(), name)
+		runtimeVersion := d.Get("managed_runtime_version").(string)
+		tflog.Debug(ctx, "Updating application pool: "+toJSON(name)+", runtime: "+runtimeVersion)
+		applicationPool, err := client.CreateAppPool(ctx, name, runtimeVersion)
 		if err != nil {
 			return diag.FromErr(err)
 		}

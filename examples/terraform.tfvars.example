@@ -1,0 +1,17 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and update with your actual values
+# DO NOT commit terraform.tfvars to version control
+
+# IIS server configuration
+iis_host = "https://192.168.99.111:55539"
+
+# API Access Token for IIS Administration API
+iis_access_key = "your-access-token-here"
+
+# NTLM Authentication credentials
+iis_ntlm_username = "administrator"
+iis_ntlm_password = "your-secure-password-here"
+iis_ntlm_domain   = ""  # Optional - leave empty for local accounts
+
+# TLS configuration
+iis_insecure = true  # Set to false in production with valid certificates

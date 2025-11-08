@@ -5,6 +5,7 @@ go 1.24
 toolchain go1.24.6
 
 require (
+	github.com/Azure/go-ntlmssp v0.0.1
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.37.0
 )

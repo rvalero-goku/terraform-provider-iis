@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"net/url"
 
+	"github.com/Azure/go-ntlmssp"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -25,6 +27,37 @@ func Provider() *schema.Provider {
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("IIS_HOST", nil),
 				Description: "The IIS host URL. Can also be sourced from the IIS_HOST environment variable.",
+			},
+			"proxy_url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("IIS_PROXY_URL", nil),
+				Description: "The proxy URL for HTTP/HTTPS requests. Can also be sourced from the IIS_PROXY_URL environment variable. Format: http://[username:password@]proxy.example.com:port",
+			},
+			"insecure": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("IIS_INSECURE", false),
+				Description: "Skip TLS certificate verification. Can also be sourced from the IIS_INSECURE environment variable.",
+			},
+			"ntlm_username": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("IIS_NTLM_USERNAME", nil),
+				Description: "Username for NTLM authentication. Can also be sourced from the IIS_NTLM_USERNAME environment variable. Use either access_key OR NTLM credentials.",
+			},
+			"ntlm_password": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				DefaultFunc: schema.EnvDefaultFunc("IIS_NTLM_PASSWORD", nil),
+				Description: "Password for NTLM authentication. Can also be sourced from the IIS_NTLM_PASSWORD environment variable. Use either access_key OR NTLM credentials.",
+			},
+			"ntlm_domain": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("IIS_NTLM_DOMAIN", nil),
+				Description: "Domain for NTLM authentication. Can also be sourced from the IIS_NTLM_DOMAIN environment variable. Optional, can be empty for local accounts.",
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
@@ -53,29 +86,75 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		})
 	}
 
+	// Get authentication credentials
 	accessKey := d.Get("access_key").(string)
-	if accessKey == "" {
+	ntlmUsername := d.Get("ntlm_username").(string)
+	ntlmPassword := d.Get("ntlm_password").(string)
+	ntlmDomain := d.Get("ntlm_domain").(string)
+
+	// Validate authentication method
+	hasAccessKey := accessKey != ""
+	hasNtlmCreds := ntlmUsername != "" && ntlmPassword != ""
+
+	if !hasAccessKey && !hasNtlmCreds {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
-			Summary:  "Missing IIS Access Key",
-			Detail:   "The IIS access key must be configured via the 'access_key' argument or IIS_ACCESS_KEY environment variable.",
+			Summary:  "Missing Authentication Credentials",
+			Detail:   "Either access_key OR NTLM credentials (username/password) must be provided. Both can be used together for IIS Administration API. Use IIS_ACCESS_KEY and/or IIS_NTLM_USERNAME/IIS_NTLM_PASSWORD environment variables.",
 		})
 	}
+
+	// Note: Both access_key and NTLM credentials can be used together
+	// NTLM for authentication, access_key for API authorization
 
 	if diags.HasError() {
 		return nil, diags
 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// Configure TLS settings
+	insecure := d.Get("insecure").(bool)
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: insecure,
 	}
-	loggingTransport := logging.NewLoggingHTTPTransport(transport)
+
+	// Configure proxy if provided
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	proxyURL := d.Get("proxy_url").(string)
+	if proxyURL != "" {
+		parsedProxyURL, err := url.Parse(proxyURL)
+		if err != nil {
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Error,
+				Summary:  "Invalid Proxy URL",
+				Detail:   "The proxy URL is not valid: " + err.Error(),
+			})
+			return nil, diags
+		}
+		transport.Proxy = http.ProxyURL(parsedProxyURL)
+	}
+
+	// Configure NTLM authentication if credentials are provided
+	var finalTransport http.RoundTripper = transport
+	if hasNtlmCreds {
+		// Wrap transport with NTLM authentication
+		finalTransport = &ntlmssp.Negotiator{
+			RoundTripper: transport,
+		}
+	}
+
+	loggingTransport := logging.NewLoggingHTTPTransport(finalTransport)
 	client := &iis.Client{
 		HttpClient: http.Client{
 			Transport: loggingTransport,
 		},
-		Host:      host,
-		AccessKey: accessKey,
+		Host:         host,
+		AccessKey:    accessKey,
+		NTLMUsername: ntlmUsername,
+		NTLMPassword: ntlmPassword,
+		NTLMDomain:   ntlmDomain,
 	}
 
 	return client, nil
