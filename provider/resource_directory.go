@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -91,7 +92,12 @@ func resourceDirectoryRead(ctx context.Context, d *schema.ResourceData, m interf
 	
 	dir, err := client.ReadFile(ctx, d.Id())
 	if err != nil {
-		d.SetId("")
+		// If the directory doesn't exist (404), remove from state
+		if isNotFoundError(err) {
+			tflog.Debug(ctx, "Directory not found, removing from state: "+d.Id())
+			d.SetId("")
+			return nil
+		}
 		return diag.FromErr(err)
 	}
 
@@ -111,6 +117,16 @@ func resourceDirectoryRead(ctx context.Context, d *schema.ResourceData, m interf
 	}
 
 	return nil
+}
+
+// isNotFoundError checks if an error is a 404 Not Found error
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check if error message contains "404" or "Not Found"
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "404") || strings.Contains(errMsg, "Not Found")
 }
 
 func resourceDirectoryDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

@@ -105,19 +105,19 @@ resource "iis_application_pool" "ntlm_test" {
   managed_runtime_version = "v4.0"
 }
 
-# Example 1: HTTP-only website
-resource "iis_website" "ntlm_test" {
-  name             = "NTLM Test Website"
-  physical_path    = "C:\\inetpub\\wwwroot"
-  application_pool = iis_application_pool.ntlm_test.id
+# # Example 1: HTTP-only website
+# resource "iis_website" "ntlm_test" {
+#   name             = "NTLM Test Website"
+#   physical_path    = "C:\\inetpub\\wwwroot"
+#   application_pool = iis_application_pool.ntlm_test.id
 
-  binding {
-    protocol   = "http"
-    port       = 8080
-    ip_address = "*"
-    hostname   = ""
-  }
-}
+#   binding {
+#     protocol   = "http"
+#     port       = 80
+#     ip_address = "*"
+#     hostname   = ""
+#   }
+# }
 
 # Example 2: HTTPS website with certificate
 # To use this, uncomment and update the certificate reference
@@ -131,7 +131,7 @@ resource "iis_website" "https_example" {
     protocol   = "http"
     port       = 80
     ip_address = "*"
-    hostname   = "example.com"
+    hostname   = "projectpulse.com"
   }
 
   # HTTPS binding with certificate
@@ -139,7 +139,7 @@ resource "iis_website" "https_example" {
     protocol   = "https"
     port       = 443
     ip_address = "*"
-    hostname   = "example.com"
+    hostname   = "projectpulse.com"
     # Use certificate ID from the data source
     # Find the desired certificate from: data.iis_certificates.available.certificates
     certificate = tolist(data.iis_certificates.available.certificates)[0].id
@@ -161,7 +161,7 @@ locals {
 }
 
 resource "iis_directory" "my_app_dir" {
-  name      = "terraform-test-dir"
+  name      = "ProjectPulse"
   parent_id = local.first_root_location.id
 }
 
@@ -212,8 +212,8 @@ output "app_pool_info" {
 
 output "website_info" {
   value = {
-    id   = iis_website.ntlm_test.id
-    name = iis_website.ntlm_test.name
+    id   = iis_website.https_example.id
+    name = iis_website.https_example.name
   }
   description = "Information about the created website"
 }

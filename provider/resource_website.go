@@ -43,7 +43,6 @@ func resourceWebsite() *schema.Resource {
 			bindingsKey: {
 				Type:     schema.TypeSet,
 				Required: true,
-				ForceNew: true,
 				Elem:     bindingSchema,
 			},
 		},
@@ -115,7 +114,41 @@ func resourceWebsiteRead(ctx context.Context, d *schema.ResourceData, m interfac
 }
 
 func resourceWebsiteUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
+	client := m.(*iis.Client)
+	
+	// Check if anything changed
+	if !d.HasChanges(nameKey, physicalPathKey, appPoolKey, bindingsKey) {
+		return nil
+	}
+	
+	// Read current state
+	site, err := client.ReadWebsite(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	
+	// Update all fields from configuration
+	site.Name = d.Get(nameKey).(string)
+	site.PhysicalPath = d.Get(physicalPathKey).(string)
+	
+	if appPool := d.Get(appPoolKey); appPool != nil && appPool != "" {
+		site.ApplicationPool = iis.ApplicationReference{
+			ID: appPool.(string),
+		}
+	}
+	
+	// Update bindings
+	bindings := d.Get(bindingsKey).(*schema.Set)
+	site.Bindings = getBindings(bindings)
+	
+	tflog.Debug(ctx, "Updating website: "+toJSON(site))
+	updatedSite, err := client.UpdateWebsite(ctx, *site)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	tflog.Debug(ctx, "Updated website: "+toJSON(updatedSite))
+	
+	return resourceWebsiteRead(ctx, d, m)
 }
 
 func resourceWebsiteDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
