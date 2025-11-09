@@ -40,6 +40,12 @@ func resourceWebsite() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
+			"status": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "started",
+				Description: "Website status: started, stopped",
+			},
 			bindingsKey: {
 				Type:     schema.TypeSet,
 				Required: true,
@@ -107,6 +113,9 @@ func resourceWebsiteRead(ctx context.Context, d *schema.ResourceData, m interfac
 	if err = d.Set(appPoolKey, site.ApplicationPool.ID); err != nil {
 		return diag.FromErr(err)
 	}
+	if err = d.Set("status", site.Status); err != nil {
+		return diag.FromErr(err)
+	}
 	if err = d.Set(bindingsKey, mapBindingsToSet(site)); err != nil {
 		return diag.FromErr(err)
 	}
@@ -117,7 +126,7 @@ func resourceWebsiteUpdate(ctx context.Context, d *schema.ResourceData, m interf
 	client := m.(*iis.Client)
 	
 	// Check if anything changed
-	if !d.HasChanges(nameKey, physicalPathKey, appPoolKey, bindingsKey) {
+	if !d.HasChanges(nameKey, physicalPathKey, appPoolKey, bindingsKey, "status") {
 		return nil
 	}
 	
@@ -130,6 +139,7 @@ func resourceWebsiteUpdate(ctx context.Context, d *schema.ResourceData, m interf
 	// Update all fields from configuration
 	site.Name = d.Get(nameKey).(string)
 	site.PhysicalPath = d.Get(physicalPathKey).(string)
+	site.Status = d.Get("status").(string)
 	
 	if appPool := d.Get(appPoolKey); appPool != nil && appPool != "" {
 		site.ApplicationPool = iis.ApplicationReference{

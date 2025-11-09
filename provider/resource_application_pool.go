@@ -77,17 +77,25 @@ func resourceApplicationPoolRead(ctx context.Context, d *schema.ResourceData, m 
 
 func resourceApplicationPoolUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*iis.Client)
-	if d.HasChange(NameKey) || d.HasChange("managed_runtime_version") {
+	id := d.Id()
+	
+	if d.HasChange(NameKey) || d.HasChange("managed_runtime_version") || d.HasChange(StatusKey) {
 		name := d.Get(NameKey).(string)
 		runtimeVersion := d.Get("managed_runtime_version").(string)
-		tflog.Debug(ctx, "Updating application pool: "+toJSON(name)+", runtime: "+runtimeVersion)
-		applicationPool, err := client.CreateAppPool(ctx, name, runtimeVersion)
+		status := d.Get(StatusKey).(string)
+		tflog.Debug(ctx, "Updating application pool: "+toJSON(id)+", name: "+name+", runtime: "+runtimeVersion+", status: "+status)
+		
+		applicationPool, err := client.UpdateAppPool(ctx, id, name, runtimeVersion, status)
 		if err != nil {
 			return diag.FromErr(err)
 		}
+		
 		tflog.Debug(ctx, "Updated application pool: "+toJSON(applicationPool))
-		d.SetId(applicationPool.ID)
+		
+		// Re-read to update state
+		return resourceApplicationPoolRead(ctx, d, m)
 	}
+	
 	return nil
 }
 
