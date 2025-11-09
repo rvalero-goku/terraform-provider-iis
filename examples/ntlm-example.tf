@@ -100,9 +100,10 @@ data "iis_file" "root_locations" {
 # }
 
 # Test resources
-resource "iis_application_pool" "ntlm_test" {
-  name                    = "NTLMTestAppPool"
+resource "iis_application_pool" "ProjectPulse" {
+  name                    = "ProjectPulseAppPool"
   managed_runtime_version = "v4.0"
+  status                  = "started"
 }
 
 # # Example 1: HTTP-only website
@@ -122,9 +123,10 @@ resource "iis_application_pool" "ntlm_test" {
 # Example 2: HTTPS website with certificate
 # To use this, uncomment and update the certificate reference
 resource "iis_website" "https_example" {
-  name             = "HTTPS Example Website"
+  name             = "ProjectPulse"
   physical_path    = "C:\\inetpub\\wwwroot"
-  application_pool = iis_application_pool.ntlm_test.id
+  application_pool = iis_application_pool.ProjectPulse.id
+  status           = "started"
 
   # HTTP binding (redirect to HTTPS in production)
   binding {
@@ -145,6 +147,7 @@ resource "iis_website" "https_example" {
     certificate = tolist(data.iis_certificates.available.certificates)[0].id
     #certificate = "YOUR_CERTIFICATE_ID_HERE"
   }
+  depends_on = [iis_application_pool.ProjectPulse]
 }
 
 # Resource: Create a new directory
@@ -204,8 +207,8 @@ output "root_file_locations" {
 
 output "app_pool_info" {
   value = {
-    id   = iis_application_pool.ntlm_test.id
-    name = iis_application_pool.ntlm_test.name
+    id   = iis_application_pool.ProjectPulse.id
+    name = iis_application_pool.ProjectPulse.name
   }
   description = "Information about the created application pool"
 }

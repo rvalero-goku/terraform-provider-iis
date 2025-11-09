@@ -23,9 +23,10 @@ func resourceApplicationPool() *schema.Resource {
 			NameKey: {
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true, // Renaming requires recreate
 			},
 			StatusKey: {
-				Type:     schema.TypeString,
+				Type:    schema.TypeString,
 				Optional: true,
 				Default:  "started",
 			},
@@ -50,7 +51,18 @@ func resourceApplicationPoolCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 	tflog.Debug(ctx, "Created application pool: "+toJSON(pool))
 	d.SetId(pool.ID)
-	return nil
+	
+	// If user specified a status different from the created status, apply it
+	if status, ok := d.GetOk(StatusKey); ok && status.(string) != "" && status.(string) != pool.Status {
+		desiredStatus := status.(string)
+		tflog.Debug(ctx, "Setting app pool status to: "+desiredStatus)
+		_, err = client.UpdateAppPool(ctx, pool.ID, runtimeVersion, desiredStatus)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	
+	return resourceApplicationPoolRead(ctx, d, m)
 }
 
 func resourceApplicationPoolRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -79,13 +91,12 @@ func resourceApplicationPoolUpdate(ctx context.Context, d *schema.ResourceData, 
 	client := m.(*iis.Client)
 	id := d.Id()
 	
-	if d.HasChange(NameKey) || d.HasChange("managed_runtime_version") || d.HasChange(StatusKey) {
-		name := d.Get(NameKey).(string)
+	if d.HasChange("managed_runtime_version") || d.HasChange(StatusKey) {
 		runtimeVersion := d.Get("managed_runtime_version").(string)
 		status := d.Get(StatusKey).(string)
-		tflog.Debug(ctx, "Updating application pool: "+toJSON(id)+", name: "+name+", runtime: "+runtimeVersion+", status: "+status)
+		tflog.Debug(ctx, "Updating application pool: "+toJSON(id)+", runtime: "+runtimeVersion+", status: "+status)
 		
-		applicationPool, err := client.UpdateAppPool(ctx, id, name, runtimeVersion, status)
+		applicationPool, err := client.UpdateAppPool(ctx, id, runtimeVersion, status)
 		if err != nil {
 			return diag.FromErr(err)
 		}

@@ -6,13 +6,11 @@ import (
 	"fmt"
 )
 
-func (client Client) UpdateAppPool(ctx context.Context, id, name, runtimeVersion, status string) (*ApplicationPool, error) {
+func (client Client) UpdateAppPool(ctx context.Context, id, runtimeVersion, status string) (*ApplicationPool, error) {
 	reqBody := struct {
-		Name                  string `json:"name"`
-		ManagedRuntimeVersion string `json:"managed_runtime_version"`
-		Status                string `json:"status"`
+		ManagedRuntimeVersion string `json:"managed_runtime_version,omitempty"`
+		Status                string `json:"status,omitempty"`
 	}{
-		Name:                  name,
 		ManagedRuntimeVersion: runtimeVersion,
 		Status:                status,
 	}

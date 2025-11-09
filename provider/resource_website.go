@@ -41,10 +41,10 @@ func resourceWebsite() *schema.Resource {
 				Optional: true,
 			},
 			"status": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "started",
+				Type:        schema.TypeString,
+				Optional:    true,
 				Description: "Website status: started, stopped",
+				Default:     "started",
 			},
 			bindingsKey: {
 				Type:     schema.TypeSet,
@@ -136,20 +136,39 @@ func resourceWebsiteUpdate(ctx context.Context, d *schema.ResourceData, m interf
 		return diag.FromErr(err)
 	}
 	
-	// Update all fields from configuration
-	site.Name = d.Get(nameKey).(string)
-	site.PhysicalPath = d.Get(physicalPathKey).(string)
-	site.Status = d.Get("status").(string)
+	// Update fields that changed
+	if d.HasChange(nameKey) {
+		site.Name = d.Get(nameKey).(string)
+	}
 	
-	if appPool := d.Get(appPoolKey); appPool != nil && appPool != "" {
-		site.ApplicationPool = iis.ApplicationReference{
-			ID: appPool.(string),
+	if d.HasChange(physicalPathKey) {
+		site.PhysicalPath = d.Get(physicalPathKey).(string)
+	}
+	
+	// Handle status: if user set it explicitly, use that. Otherwise keep current status.
+	if d.HasChange("status") {
+		desiredStatus := d.Get("status").(string)
+		if desiredStatus != "" {
+			site.Status = desiredStatus
+			tflog.Debug(ctx, "Updating website status to: "+desiredStatus)
+		}
+	}
+	// If status hasn't changed in config, preserve current status from API
+	// This prevents us from sending empty status and breaking the site
+	
+	if d.HasChange(appPoolKey) {
+		if appPool := d.Get(appPoolKey); appPool != nil && appPool != "" {
+			site.ApplicationPool = iis.ApplicationReference{
+				ID: appPool.(string),
+			}
 		}
 	}
 	
 	// Update bindings
-	bindings := d.Get(bindingsKey).(*schema.Set)
-	site.Bindings = getBindings(bindings)
+	if d.HasChange(bindingsKey) {
+		bindings := d.Get(bindingsKey).(*schema.Set)
+		site.Bindings = getBindings(bindings)
+	}
 	
 	tflog.Debug(ctx, "Updating website: "+toJSON(site))
 	updatedSite, err := client.UpdateWebsite(ctx, *site)
