@@ -66,10 +66,12 @@ func Provider() *schema.Provider {
 			"iis_application":      resourceApplication(),
 			"iis_authentication":   resourceAuthentication(),
 			"iis_website":          resourceWebsite(),
+			"iis_directory":        resourceDirectory(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"iis_website":      dataSourceIisWebsite(),
 			"iis_certificates": dataSourceIisCertificates(),
+			"iis_file":         dataSourceIisFile(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
@@ -127,6 +129,10 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		IdleConnTimeout:     90 * time.Second,
 		// Enable keep-alive for better NTLM session persistence
 		DisableKeepAlives: false,
+		// Add timeouts for better reliability
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 
 	proxyURL := d.Get("proxy_url").(string)
@@ -156,9 +162,9 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	client := &iis.Client{
 		HttpClient: http.Client{
 			Transport: loggingTransport,
-			// Set reasonable timeout to prevent hanging on auth issues
-			// This timeout applies to the entire request-response cycle
-			Timeout: 30 * time.Second,
+			// Increased timeout to accommodate retries
+			// Total time: 5 retries * max 16s backoff + 60s request time
+			Timeout: 120 * time.Second,
 		},
 		Host:         host,
 		AccessKey:    accessKey,

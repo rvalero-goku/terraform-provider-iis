@@ -86,6 +86,59 @@ The configuration creates:
 - An IIS Application Pool with .NET Framework v4.0
 - An IIS Website with HTTP binding
 - Example HTTPS binding configuration (commented out)
+- File system browsing via Files API
+
+### Files API
+
+The provider supports the IIS Administration Files API for managing directories and browsing the file system:
+
+#### List Root Locations
+
+```hcl
+# List configured root file locations
+data "iis_file" "root_locations" {
+  # No parent_id means list root locations
+}
+
+output "root_file_locations" {
+  value = [
+    for file in data.iis_file.root_locations.files : {
+      name          = file.name
+      type          = file.type
+      physical_path = file.physical_path
+    }
+  ]
+}
+```
+
+#### Browse a Directory
+
+```hcl
+# List files in a specific directory
+data "iis_file" "directory_files" {
+  parent_id = "YOUR_PARENT_DIRECTORY_ID"
+}
+```
+
+#### Browse Web Server Files
+
+```hcl
+# List files for a specific website (virtual file structure)
+data "iis_file" "website_files" {
+  website_id = iis_website.ntlm_test.id
+}
+```
+
+#### Create a Directory
+
+```hcl
+resource "iis_directory" "my_app" {
+  name      = "myapp"
+  parent_id = "PARENT_DIRECTORY_ID"
+}
+```
+
+**Note:** File locations must be configured in the IIS Administration API `appsettings.json` file. By default, only specific root directories are accessible through the API.
 
 ### HTTP Binding
 

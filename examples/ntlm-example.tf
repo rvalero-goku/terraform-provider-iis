@@ -81,6 +81,24 @@ provider "iis" {
 # Data source to fetch available certificates
 data "iis_certificates" "available" {}
 
+# Data source: List root file locations
+# These are the configured root directories in appsettings.json
+data "iis_file" "root_locations" {
+  # No parent_id means list root locations
+}
+
+# Data source: List files in a specific directory
+# Uncomment and set parent_id to browse a specific directory
+# data "iis_file" "directory_files" {
+#   parent_id = "PARENT_DIRECTORY_ID_HERE"
+# }
+
+# Data source: List web server files for a website
+# This uses the /api/webserver/files endpoint
+# data "iis_file" "website_files" {
+#   website_id = iis_website.ntlm_test.id
+# }
+
 # Test resources
 resource "iis_application_pool" "ntlm_test" {
   name                    = "NTLMTestAppPool"
@@ -103,31 +121,58 @@ resource "iis_website" "ntlm_test" {
 
 # Example 2: HTTPS website with certificate
 # To use this, uncomment and update the certificate reference
-# resource "iis_website" "https_example" {
-#   name             = "HTTPS Example Website"
-#   physical_path    = "C:\\inetpub\\wwwroot"
-#   application_pool = iis_application_pool.ntlm_test.id
+resource "iis_website" "https_example" {
+  name             = "HTTPS Example Website"
+  physical_path    = "C:\\inetpub\\wwwroot"
+  application_pool = iis_application_pool.ntlm_test.id
+
+  # HTTP binding (redirect to HTTPS in production)
+  binding {
+    protocol   = "http"
+    port       = 80
+    ip_address = "*"
+    hostname   = "example.com"
+  }
+
+  # HTTPS binding with certificate
+  binding {
+    protocol   = "https"
+    port       = 443
+    ip_address = "*"
+    hostname   = "example.com"
+    # Use certificate ID from the data source
+    # Find the desired certificate from: data.iis_certificates.available.certificates
+    certificate = tolist(data.iis_certificates.available.certificates)[0].id
+    #certificate = "YOUR_CERTIFICATE_ID_HERE"
+  }
+}
+
+# Resource: Create a new directory
+# This example shows how to use a data source to find the parent directory
+# and then create a subdirectory within it
 #
-#   # HTTP binding (redirect to HTTPS in production)
-#   binding {
-#     protocol   = "http"
-#     port       = 80
-#     ip_address = "*"
-#     hostname   = "example.com"
-#   }
+# Uncomment the following to create a directory:
 #
-#   # HTTPS binding with certificate
-#   binding {
-#     protocol    = "https"
-#     port        = 443
-#     ip_address  = "*"
-#     hostname    = "example.com"
-#     # Use certificate ID from the data source
-#     # Find the desired certificate from: data.iis_certificates.available.certificates
-#     # Example: certificate = tolist(data.iis_certificates.available.certificates)[0].id
-#     certificate = "YOUR_CERTIFICATE_ID_HERE"
-#   }
-# }
+locals {
+  # Convert set to list to access the first element
+  root_locations_list = tolist(data.iis_file.root_locations.files)
+  # Use the first root location as parent
+  first_root_location = length(local.root_locations_list) > 0 ? local.root_locations_list[0] : null
+}
+
+resource "iis_directory" "my_app_dir" {
+  name      = "terraform-test-dir"
+  parent_id = local.first_root_location.id
+}
+
+output "created_directory" {
+  value = {
+    id            = iis_directory.my_app_dir.id
+    name          = iis_directory.my_app_dir.name
+    physical_path = iis_directory.my_app_dir.physical_path
+  }
+  description = "Information about the created directory"
+}
 
 # Outputs
 output "available_certificates" {
@@ -141,6 +186,20 @@ output "available_certificates" {
     }
   ]
   description = "List of available certificates on the IIS server"
+}
+
+output "root_file_locations" {
+  value = [
+    for file in data.iis_file.root_locations.files : {
+      name          = file.name
+      id            = file.id
+      type          = file.type
+      physical_path = file.physical_path
+      exists        = file.exists
+      total_files   = file.total_files
+    }
+  ]
+  description = "List of root file locations configured in IIS"
 }
 
 output "app_pool_info" {

@@ -93,19 +93,25 @@ func buildRequest(ctx context.Context, client Client, method, path string, body 
 	return req, nil
 }
 
-func executeRequest(client Client, req *http.Request) (*http.Response, error) {
-	// Retry configuration for NTLM authentication issues
-	const maxRetries = 3
-	const initialBackoff = 500 * time.Millisecond
+func request(ctx context.Context, client Client, method, path string, body interface{}) (*http.Response, error) {
+	// Enhanced retry configuration for NTLM authentication issues
+	const maxRetries = 5
+	const initialBackoff = 1000 * time.Millisecond
 	
 	var response *http.Response
 	var err error
 	
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			// Exponential backoff: 500ms, 1s, 2s
+			// Exponential backoff: 1s, 2s, 4s, 8s, 16s
 			backoff := initialBackoff * time.Duration(1<<uint(attempt-1))
 			time.Sleep(backoff)
+		}
+		
+		// Build a fresh request for each attempt (important for NTLM and body reuse)
+		req, err := buildRequest(ctx, client, method, path, body)
+		if err != nil {
+			return nil, err
 		}
 		
 		response, err = client.HttpClient.Do(req)
@@ -126,13 +132,22 @@ func executeRequest(client Client, req *http.Request) (*http.Response, error) {
 			continue
 		}
 		
-		// Success or non-retryable error
-		break
+		// Check status code before returning
+		if err := guardStatusCode(method, req.URL, response); err != nil {
+			// If this is a retryable error and we have retries left, continue
+			if shouldRetry(response.StatusCode) && attempt < maxRetries-1 {
+				if response.Body != nil {
+					response.Body.Close()
+				}
+				continue
+			}
+			return nil, err
+		}
+		
+		// Success!
+		return response, nil
 	}
 	
-	if err := guardStatusCode(req.Method, req.URL, response); err != nil {
-		return nil, err
-	}
 	return response, err
 }
 
@@ -140,15 +155,19 @@ func executeRequest(client Client, req *http.Request) (*http.Response, error) {
 func shouldRetry(statusCode int) bool {
 	// Retry on authentication failures (401), server errors (5xx), and too many requests (429)
 	// These are common with NTLM authentication issues and transient server problems
-	return statusCode == 401 || statusCode == 429 || (statusCode >= 500 && statusCode < 600)
+	// Also retry on 403 as NTLM can sometimes return this during negotiation
+	return statusCode == 401 || statusCode == 403 || statusCode == 429 || (statusCode >= 500 && statusCode < 600)
 }
 
-func request(ctx context.Context, client Client, method, path string, body interface{}) (*http.Response, error) {
-	req, err := buildRequest(ctx, client, method, path, body)
+func executeRequest(client Client, req *http.Request) (*http.Response, error) {
+	response, err := client.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	return executeRequest(client, req)
+	if err := guardStatusCode(req.Method, req.URL, response); err != nil {
+		return nil, err
+	}
+	return response, err
 }
 
 func fetchBody(res *http.Response) ([]byte, error) {
