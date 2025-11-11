@@ -18,22 +18,25 @@ func resourceApplicationPool() *schema.Resource {
 		ReadContext:   resourceApplicationPoolRead,
 		UpdateContext: resourceApplicationPoolUpdate,
 		DeleteContext: resourceApplicationPoolDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			NameKey: {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true, // Renaming requires recreate
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true, // Renaming requires recreate
 			},
 			StatusKey: {
-				Type:    schema.TypeString,
-				Optional: true,
-				Default:  "started",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "started",
 			},
 			"managed_runtime_version": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "v4.0",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "v4.0",
 				Description: ".NET CLR version for the app pool (e.g., v4.0, v2.0)",
 			},
 		},

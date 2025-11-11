@@ -26,6 +26,9 @@ func resourceWebsite() *schema.Resource {
 		ReadContext:   resourceWebsiteRead,
 		UpdateContext: resourceWebsiteUpdate,
 		DeleteContext: resourceWebsiteDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			nameKey: {

@@ -1,0 +1,83 @@
+# IIS Infrastructure Configuration
+# Define all your IIS servers and their resources here
+
+servers:
+  server1:
+    host: "https:/server1:55539"
+    enabled: true
+    # Per-server authentication
+    access_key: ""
+    ntlm_username: ""
+    ntlm_password: ""
+    #ntlm_domain: ""
+    insecure: true
+    
+  server2:
+    host: "https://server2:55540"
+    enabled: true
+    # Per-server authentication
+    access_key: ""
+    ntlm_username: ""
+    ntlm_password: ""
+    #ntlm_domain: ""
+    insecure: true
+
+# Application Pools - deployed to all enabled servers
+application_pools:
+  # DefaultAppPool:
+  #   managed_runtime_version: "v4.0"
+  #   status: "started"
+  
+  ProjectPulseAppPool:
+    managed_runtime_version: "v4.0"
+    status: "started"
+  
+
+# Websites - deployed to all enabled servers
+websites:
+  # "Default Web Site":
+  #   physical_path: "C:\\inetpub\\ProjectPulse"
+  #   application_pool: "DefaultAppPool"
+  #   status: "stopped"
+  #   bindings:
+  #     - protocol: "http"
+  #       port: 80
+  #       ip_address: "*"
+  #       hostname: ""
+  
+  ProjectPulse:
+    physical_path: "C:\\inetpub\\ProjectPulse"
+    application_pool: "ProjectPulseAppPool"
+    status: "started"
+    bindings:
+      - protocol: "http"
+        port: 80
+        ip_address: "*"
+        hostname: "contoso.com"
+      # - protocol: "http"
+      #   port: 80
+      #   ip_address: "*"
+      #   hostname: ""
+      - protocol: "https"
+        port: 443
+        ip_address: "*"
+        hostname: "contoso.com"
+        certificate_cn: "contoso.com"  # Certificate Common Name (without CN= prefix)
+      # - protocol: "https"
+      #   port: 444
+      #   ip_address: "*"
+      #   hostname: ""
+      #   certificate_cn: "contoso.com"  # Certificate Common Name (without CN= prefix)
+
+
+# Directories - deployed to all enabled servers
+directories:
+  ProjectPulse:
+    parent: "inetpub"  # Will use root location matching this name
+
+# File operations - deployed to all enabled servers
+file_operations:
+  default_aspx:
+    source_path: "C:\\ProgramData\\GuestConfig\\Configuration\\ProjectPulse\\Modules\\AdditionalFiles\\default.aspx"
+    destination_path: "C:\\inetpub\\ProjectPulse"
+    move: false  # Set to false to copy instead of move

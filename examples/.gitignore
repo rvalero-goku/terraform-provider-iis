@@ -13,6 +13,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+iis-config.yaml
 
 # OS files
 .DS_Store

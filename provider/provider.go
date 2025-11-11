@@ -67,6 +67,7 @@ func Provider() *schema.Provider {
 			"iis_authentication":   resourceAuthentication(),
 			"iis_website":          resourceWebsite(),
 			"iis_directory":        resourceDirectory(),
+			"iis_file_copy":        resourceFileCopy(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"iis_website":      dataSourceIisWebsite(),
