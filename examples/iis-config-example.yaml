@@ -3,23 +3,21 @@
 
 servers:
   server1:
-    host: "https:/server1:55539"
+    host: "https://rey-colonvalero.projectpulse.me:55539"
     enabled: true
-    # Per-server authentication
-    access_key: ""
-    ntlm_username: ""
-    ntlm_password: ""
-    #ntlm_domain: ""
+    # NTLM authentication (provider auto-generates API tokens)
+    ntlm_username: "azureuser"
+    ntlm_password: "0Go+j5}mdhn(_Ea?945wLrPX"
+    # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
     
   server2:
-    host: "https://server2:55540"
+    host: "https://rey-colonvalero.projectpulse.me:55540"
     enabled: true
-    # Per-server authentication
-    access_key: ""
-    ntlm_username: ""
-    ntlm_password: ""
-    #ntlm_domain: ""
+    # NTLM authentication (provider auto-generates API tokens)
+    ntlm_username: "azureuser"
+    ntlm_password: "0Go+j5}mdhn(_Ea?945wLrPX"
+    # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
 
 # Application Pools - deployed to all enabled servers
@@ -53,7 +51,7 @@ websites:
       - protocol: "http"
         port: 80
         ip_address: "*"
-        hostname: "contoso.com"
+        hostname: "rey-colonvalero.projectpulse.me"
       # - protocol: "http"
       #   port: 80
       #   ip_address: "*"
@@ -61,13 +59,13 @@ websites:
       - protocol: "https"
         port: 443
         ip_address: "*"
-        hostname: "contoso.com"
-        certificate_cn: "contoso.com"  # Certificate Common Name (without CN= prefix)
+        hostname: "rey-colonvalero.projectpulse.me"
+        certificate_cn: "rey-colonvalero.projectpulse.me"  # Certificate Common Name (without CN= prefix)
       # - protocol: "https"
       #   port: 444
       #   ip_address: "*"
       #   hostname: ""
-      #   certificate_cn: "contoso.com"  # Certificate Common Name (without CN= prefix)
+      #   certificate_cn: "rey-colonvalero.projectpulse.me"  # Certificate Common Name (without CN= prefix)
 
 
 # Directories - deployed to all enabled servers

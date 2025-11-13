@@ -11,6 +11,7 @@ Terraform Provider using the [Microsoft IIS Administration](https://docs.microso
 - ✅ **Proxy Support** - HTTP/HTTPS proxy with authentication
 - ✅ **NTLM Authentication** - Windows domain and local user authentication
 - ✅ **TLS Configuration** - Skip verification for internal servers
+- ✅ **GitHub Actions Integration** - Automate deployments via CI/CD
 - ✅ Environment variable configuration
 
 ## Quick Start
@@ -289,6 +290,44 @@ Check if the provider is correctly installed:
 ```bash
 terraform providers
 ```
+
+## GitHub Actions Integration
+
+This provider includes reusable GitHub Actions workflows for automated deployments. You can call these workflows from other repositories to manage your IIS infrastructure via CI/CD.
+
+### Quick Example
+
+```yaml
+# In your repository: .github/workflows/deploy-iis.yml
+name: Deploy IIS Infrastructure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: rvalero-goku/terraform-provider-iis/.github/workflows/apply-iis-config.yml@main
+    with:
+      config_yaml: ${{ secrets.IIS_CONFIG }}
+      auto_approve: true
+```
+
+### Documentation
+
+- **[GitHub Actions Guide](docs/GITHUB_ACTIONS.md)** - Complete integration guide
+- **[Workflow Templates](docs/WORKFLOW_TEMPLATES.md)** - Copy-paste templates
+- **[Examples](.github/workflows/example-caller.yml)** - Reference implementations
+
+### Key Features
+
+- 🚀 Automated deployments from other repositories
+- 🔧 Builds provider from source (no manual installation)
+- 📝 YAML-based configuration
+- 🔄 Multi-server support
+- 🔒 Secure secret management
+- 📊 Terraform state artifacts
+
+See [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md) for detailed usage instructions.
 
 ## Contributing
 

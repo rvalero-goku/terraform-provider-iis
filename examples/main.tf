@@ -1,5 +1,6 @@
 # IIS Multi-Server Configuration using YAML
 # This example shows how to manage multiple IIS servers with a single configuration
+# The provider automatically generates API tokens when NTLM credentials are provided
 
 terraform {
   required_providers {
@@ -9,98 +10,40 @@ terraform {
   }
 }
 
-# Variables for authentication
-variable "iis_access_key" {
-  description = "API Access Token for IIS Administration API"
-  type        = string
-  sensitive   = true
-  default     = "" # Will be overridden by YAML if set
-}
-
-variable "iis_ntlm_username" {
-  description = "Username for NTLM authentication"
-  type        = string
-  sensitive   = true
-  default     = "" # Will be overridden by YAML if set
-}
-
-variable "iis_ntlm_password" {
-  description = "Password for NTLM authentication"
-  type        = string
-  sensitive   = true
-  default     = "" # Will be overridden by YAML if set
-}
-
-variable "iis_ntlm_domain" {
-  description = "Domain for NTLM authentication"
-  type        = string
-  default     = ""
-}
-
-variable "iis_insecure" {
-  description = "Skip TLS certificate verification"
-  type        = bool
-  default     = false
-}
-
 # Load configuration from YAML
 locals {
-  config = yamldecode(file("${path.module}/iis-config.yaml"))
+  config = yamldecode(file("${path.module}/iis-config-example.yaml"))
+}
 
-  # Helper function to get server config value or fallback to variable
-  server1_access_key    = try(local.config.servers.server1.access_key, "") != "" ? local.config.servers.server1.access_key : var.iis_access_key
-  server1_ntlm_username = try(local.config.servers.server1.ntlm_username, "") != "" ? local.config.servers.server1.ntlm_username : var.iis_ntlm_username
-  server1_ntlm_password = try(local.config.servers.server1.ntlm_password, "") != "" ? local.config.servers.server1.ntlm_password : var.iis_ntlm_password
-  server1_ntlm_domain   = try(local.config.servers.server1.ntlm_domain, "") != "" ? local.config.servers.server1.ntlm_domain : var.iis_ntlm_domain
-  server1_insecure      = try(local.config.servers.server1.insecure, var.iis_insecure)
-
-  server2_access_key    = try(local.config.servers.server2.access_key, "") != "" ? local.config.servers.server2.access_key : var.iis_access_key
-  server2_ntlm_username = try(local.config.servers.server2.ntlm_username, "") != "" ? local.config.servers.server2.ntlm_username : var.iis_ntlm_username
-  server2_ntlm_password = try(local.config.servers.server2.ntlm_password, "") != "" ? local.config.servers.server2.ntlm_password : var.iis_ntlm_password
-  server2_ntlm_domain   = try(local.config.servers.server2.ntlm_domain, "") != "" ? local.config.servers.server2.ntlm_domain : var.iis_ntlm_domain
-  server2_insecure      = try(local.config.servers.server2.insecure, var.iis_insecure)
-
-  # Certificate lookup helpers - finds certificate ID by CN (requires data sources to be loaded)
-  server1_wildcard_cert = try(
-    [for cert in data.iis_certificates.server1[0].certificates : cert.id if strcontains(cert.subject, "loved-quagga.projectpulse.me")][0],
-    null
-  )
-
-  server2_wildcard_cert = try(
-    [for cert in data.iis_certificates.server2[0].certificates : cert.id if strcontains(cert.subject, "loved-quagga.projectpulse.me")][0],
-    null
-  )
-} # Provider configurations - must be defined statically
+# Provider configurations
+# The provider automatically generates API tokens when NTLM credentials are provided
 # Default provider (required even when using only aliased providers)
 provider "iis" {
   host          = local.config.servers.server1.host
-  access_key    = local.server1_access_key
-  ntlm_username = local.server1_ntlm_username
-  ntlm_password = local.server1_ntlm_password
-  ntlm_domain   = local.server1_ntlm_domain
-  insecure      = local.server1_insecure
+  ntlm_username = local.config.servers.server1.ntlm_username
+  ntlm_password = local.config.servers.server1.ntlm_password
+  ntlm_domain   = try(local.config.servers.server1.ntlm_domain, "")
+  insecure      = try(local.config.servers.server1.insecure, false)
 }
 
 # Provider for server1
 provider "iis" {
   alias         = "server1"
   host          = local.config.servers.server1.host
-  access_key    = local.server1_access_key
-  ntlm_username = local.server1_ntlm_username
-  ntlm_password = local.server1_ntlm_password
-  ntlm_domain   = local.server1_ntlm_domain
-  insecure      = local.server1_insecure
+  ntlm_username = local.config.servers.server1.ntlm_username
+  ntlm_password = local.config.servers.server1.ntlm_password
+  ntlm_domain   = try(local.config.servers.server1.ntlm_domain, "")
+  insecure      = try(local.config.servers.server1.insecure, false)
 }
 
 # Provider for server2
 provider "iis" {
   alias         = "server2"
   host          = local.config.servers.server2.host
-  access_key    = local.server2_access_key
-  ntlm_username = local.server2_ntlm_username
-  ntlm_password = local.server2_ntlm_password
-  ntlm_domain   = local.server2_ntlm_domain
-  insecure      = local.server2_insecure
+  ntlm_username = local.config.servers.server2.ntlm_username
+  ntlm_password = local.config.servers.server2.ntlm_password
+  ntlm_domain   = try(local.config.servers.server2.ntlm_domain, "")
+  insecure      = try(local.config.servers.server2.insecure, false)
 }
 
 # ============================================================================
@@ -161,12 +104,11 @@ resource "iis_website" "server1" {
       ip_address = try(binding.value.ip_address, "*")
       hostname   = try(binding.value.hostname, "")
 
-      # Use certificate if specified by CN
-      certificate = try(binding.value.certificate_cn, null) != null ? local.server1_wildcard_cert : (
-        try(binding.value.use_certificate, false) && length(data.iis_certificates.server1) > 0 ? tolist(
-          data.iis_certificates.server1[0].certificates
-        )[0].id : null
-      )
+      # Dynamically look up certificate by CN from YAML if specified
+      certificate = try(binding.value.certificate_cn, null) != null ? try(
+        [for cert in data.iis_certificates.server1[0].certificates : cert.id if strcontains(cert.subject, binding.value.certificate_cn)][0],
+        null
+      ) : null
     }
   }
 
@@ -252,12 +194,11 @@ resource "iis_website" "server2" {
       ip_address = try(binding.value.ip_address, "*")
       hostname   = try(binding.value.hostname, "")
 
-      # Use certificate if specified by CN
-      certificate = try(binding.value.certificate_cn, null) != null ? local.server2_wildcard_cert : (
-        try(binding.value.use_certificate, false) && length(data.iis_certificates.server2) > 0 ? tolist(
-          data.iis_certificates.server2[0].certificates
-        )[0].id : null
-      )
+      # Dynamically look up certificate by CN from YAML if specified
+      certificate = try(binding.value.certificate_cn, null) != null ? try(
+        [for cert in data.iis_certificates.server2[0].certificates : cert.id if strcontains(cert.subject, binding.value.certificate_cn)][0],
+        null
+      ) : null
     }
   }
 
@@ -326,14 +267,6 @@ output "server2_certificates" {
     }
   ] : []
   description = "Available certificates on server2"
-}
-
-output "selected_certificate_ids" {
-  value = {
-    server1 = local.server1_wildcard_cert
-    server2 = local.server2_wildcard_cert
-  }
-  description = "Selected wildcard certificate IDs"
 }
 
 output "server1_existing_websites" {

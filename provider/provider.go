@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -68,6 +69,7 @@ func Provider() *schema.Provider {
 			"iis_website":          resourceWebsite(),
 			"iis_directory":        resourceDirectory(),
 			"iis_file_copy":        resourceFileCopy(),
+			"iis_api_token":        resourceApiToken(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"iis_website":      dataSourceIisWebsite(),
@@ -172,6 +174,25 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		NTLMUsername: ntlmUsername,
 		NTLMPassword: ntlmPassword,
 		NTLMDomain:   ntlmDomain,
+	}
+
+	// Auto-generate API token if only NTLM credentials are provided
+	// IIS Administration API requires both NTLM auth + access token for most operations
+	if hasNtlmCreds && !hasAccessKey {
+		tflog.Info(context.Background(), "No access_key provided, auto-generating API token using NTLM credentials")
+		
+		token, err := client.GenerateApiToken(context.Background(), ntlmUsername, ntlmPassword, ntlmDomain)
+		if err != nil {
+			tflog.Warn(context.Background(), "Failed to auto-generate API token, will attempt operations with NTLM only", map[string]interface{}{
+				"error": err.Error(),
+			})
+			// Don't fail - some operations might work with NTLM only
+		} else {
+			tflog.Info(context.Background(), "Successfully auto-generated API token", map[string]interface{}{
+				"token_length": len(token),
+			})
+			client.AccessKey = token
+		}
 	}
 
 	return client, nil
