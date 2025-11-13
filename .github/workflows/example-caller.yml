@@ -1,0 +1,116 @@
+# Example: How to call the IIS Configuration workflow from another repository
+#
+# This example shows different ways to invoke the reusable workflow:
+# 1. Manually triggered with custom YAML
+# 2. On push with YAML from the repository
+# 3. Scheduled deployment
+# 4. Called from another workflow
+
+name: Deploy IIS Infrastructure
+
+on:
+  # Manual trigger with custom YAML input
+  workflow_dispatch:
+    inputs:
+      config_yaml:
+        description: 'IIS Configuration YAML (leave empty to use file from repo)'
+        required: false
+        type: string
+      auto_approve:
+        description: 'Auto approve the deployment'
+        required: true
+        type: boolean
+        default: false
+      destroy:
+        description: 'Destroy infrastructure'
+        required: false
+        type: boolean
+        default: false
+  
+  # Automatic trigger on push to main
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/iis-config.yaml'
+      - '.github/workflows/deploy-iis.yml'
+  
+  # Scheduled deployment (example: weekly)
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+
+jobs:
+  deploy:
+    name: Deploy IIS Configuration
+    uses: rvalero-goku/terraform-provider-iis/.github/workflows/apply-iis-config.yml@main
+    with:
+      # If config_yaml input is provided, use it; otherwise read from file
+      config_yaml: |
+        ${{ inputs.config_yaml || '' }}
+      
+      # You can also load from a file in your repository:
+      # config_yaml: ${{ github.event_name == 'workflow_dispatch' && inputs.config_yaml || steps.load-config.outputs.yaml }}
+      
+      provider_version: '0.1.0'
+      terraform_version: 'latest'
+      working_directory: './terraform-iis'
+      auto_approve: ${{ inputs.auto_approve || github.event_name == 'push' || github.event_name == 'schedule' }}
+      destroy: ${{ inputs.destroy || false }}
+    secrets:
+      ADDITIONAL_SECRETS: ${{ secrets.IIS_SECRETS }}
+
+  # Example: Load config from file and deploy
+  deploy-from-file:
+    name: Deploy from Config File
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Load IIS Configuration
+        id: load-config
+        run: |
+          if [ -f "infrastructure/iis-config.yaml" ]; then
+            # Read the YAML file and set as output
+            CONFIG=$(cat infrastructure/iis-config.yaml)
+            # Use multiline output format
+            echo "yaml<<EOF" >> $GITHUB_OUTPUT
+            echo "$CONFIG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "Configuration file not found!"
+            exit 1
+          fi
+      
+      - name: Call IIS Deployment Workflow
+        uses: rvalero-goku/terraform-provider-iis/.github/workflows/apply-iis-config.yml@main
+        with:
+          config_yaml: ${{ steps.load-config.outputs.yaml }}
+          provider_version: '0.1.0'
+          auto_approve: true
+          destroy: false
+
+  # Example: Post-deployment notification
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Check Deployment Status
+        run: |
+          echo "Deployment Status: ${{ needs.deploy.result }}"
+          echo "Terraform Output: ${{ needs.deploy.outputs.terraform_output }}"
+      
+      - name: Send Notification
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ IIS Infrastructure deployed successfully!"
+          # Add your notification logic here (Slack, Teams, Email, etc.)
+      
+      - name: Send Failure Notification
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ IIS Infrastructure deployment failed!"
+          # Add your failure notification logic here

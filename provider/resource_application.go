@@ -80,6 +80,41 @@ func resourceApplicationRead(ctx context.Context, d *schema.ResourceData, m inte
 }
 
 func resourceApplicationUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	client := m.(*iis.Client)
+	id := d.Id()
+	
+	// Check if any updateable fields have changed
+	if d.HasChange(PathKey) || d.HasChange(PhysicalPathKey) || d.HasChange(ApplicationPoolKey) {
+		tflog.Debug(ctx, "Updating application: "+toJSON(id))
+		
+		updateReq := iis.UpdateApplicationRequest{}
+		
+		if d.HasChange(PathKey) {
+			updateReq.Path = d.Get(PathKey).(string)
+		}
+		
+		if d.HasChange(PhysicalPathKey) {
+			updateReq.PhysicalPath = d.Get(PhysicalPathKey).(string)
+		}
+		
+		if d.HasChange(ApplicationPoolKey) {
+			appPoolID := d.Get(ApplicationPoolKey).(string)
+			if appPoolID != "" {
+				updateReq.ApplicationPool = iis.Reference{ID: appPoolID}
+			}
+		}
+		
+		app, err := client.UpdateApplication(ctx, id, updateReq)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		
+		tflog.Debug(ctx, "Updated application: "+toJSON(app))
+		
+		// Re-read to update state
+		return resourceApplicationRead(ctx, d, m)
+	}
+	
 	return nil
 }
 

@@ -1,0 +1,214 @@
+name: Apply IIS Configuration
+
+on:
+  workflow_call:
+    inputs:
+      config_yaml:
+        description: 'IIS configuration YAML content'
+        required: true
+        type: string
+      provider_version:
+        description: 'IIS provider version to use'
+        required: false
+        type: string
+        default: '0.1.0'
+      terraform_version:
+        description: 'Terraform/OpenTofu version to use'
+        required: false
+        type: string
+        default: 'latest'
+      working_directory:
+        description: 'Working directory for Terraform'
+        required: false
+        type: string
+        default: '.'
+      auto_approve:
+        description: 'Auto approve the Terraform apply'
+        required: false
+        type: boolean
+        default: false
+      destroy:
+        description: 'Destroy infrastructure instead of apply'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      # Optional: Pass secrets if needed for the IIS servers
+      # These can be used if your YAML config references GitHub secrets
+      ADDITIONAL_SECRETS:
+        required: false
+    outputs:
+      terraform_output:
+        description: 'Terraform output JSON'
+        value: ${{ jobs.apply.outputs.terraform_output }}
+
+jobs:
+  apply:
+    name: Apply IIS Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_output: ${{ steps.output.outputs.json }}
+    
+    steps:
+      - name: Checkout IIS Provider Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+      
+      - name: Build IIS Provider
+        run: |
+          echo "Building IIS Terraform Provider..."
+          go build -o terraform-provider-iis_v${{ inputs.provider_version }}
+          chmod +x terraform-provider-iis_v${{ inputs.provider_version }}
+          
+          # Create provider directory structure
+          PROVIDER_DIR="$HOME/.terraform.d/plugins/terraform.local/maxjoehnk/iis/${{ inputs.provider_version }}/linux_amd64"
+          mkdir -p "$PROVIDER_DIR"
+          
+          # Copy provider binary to plugin directory
+          cp terraform-provider-iis_v${{ inputs.provider_version }} "$PROVIDER_DIR/terraform-provider-iis_v${{ inputs.provider_version }}"
+          
+          echo "Provider built and installed to: $PROVIDER_DIR"
+          ls -la "$PROVIDER_DIR"
+      
+      - name: Setup Terraform CLI Config
+        run: |
+          # Create Terraform CLI config with dev overrides
+          mkdir -p $HOME/.terraform.d
+          cat > $HOME/.terraform.d/terraform.rc << EOF
+          provider_installation {
+            dev_overrides {
+              "terraform.local/maxjoehnk/iis" = "$HOME/.terraform.d/plugins/terraform.local/maxjoehnk/iis/${{ inputs.provider_version }}/linux_amd64"
+            }
+            direct {
+              exclude = ["terraform.local/*/*"]
+            }
+          }
+          EOF
+          
+          echo "Terraform CLI config created:"
+          cat $HOME/.terraform.d/terraform.rc
+      
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ inputs.terraform_version }}
+          tofu_wrapper: false
+      
+      - name: Create Terraform Configuration
+        run: |
+          # Create working directory
+          WORK_DIR="${{ inputs.working_directory }}"
+          mkdir -p "$WORK_DIR"
+          cd "$WORK_DIR"
+          
+          # Write the YAML config
+          cat > iis-config.yaml << 'EOF'
+          ${{ inputs.config_yaml }}
+          EOF
+          
+          echo "IIS Configuration YAML created:"
+          cat iis-config.yaml
+          
+          # Copy the main.tf from examples
+          cp $GITHUB_WORKSPACE/examples/main.tf .
+          
+          # Update main.tf to use iis-config.yaml instead of iis-config-example.yaml
+          sed -i 's/iis-config-example\.yaml/iis-config.yaml/g' main.tf
+          
+          echo "Terraform configuration created:"
+          ls -la
+      
+      - name: Terraform Init
+        id: init
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          tofu init -upgrade
+        env:
+          TF_CLI_CONFIG_FILE: $HOME/.terraform.d/terraform.rc
+      
+      - name: Terraform Validate
+        id: validate
+        working-directory: ${{ inputs.working_directory }}
+        run: tofu validate -no-color
+        env:
+          TF_CLI_CONFIG_FILE: $HOME/.terraform.d/terraform.rc
+      
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          if [ "${{ inputs.destroy }}" = "true" ]; then
+            tofu plan -destroy -no-color -out=tfplan
+          else
+            tofu plan -no-color -out=tfplan
+          fi
+        env:
+          TF_CLI_CONFIG_FILE: $HOME/.terraform.d/terraform.rc
+        continue-on-error: true
+      
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      
+      - name: Terraform Apply
+        id: apply
+        if: inputs.auto_approve == true
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          if [ "${{ inputs.destroy }}" = "true" ]; then
+            tofu apply -auto-approve tfplan
+          else
+            tofu apply -auto-approve tfplan
+          fi
+        env:
+          TF_CLI_CONFIG_FILE: $HOME/.terraform.d/terraform.rc
+      
+      - name: Terraform Output
+        id: output
+        if: steps.apply.outcome == 'success' && inputs.destroy == false
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          OUTPUT_JSON=$(tofu output -json)
+          echo "json=$OUTPUT_JSON" >> $GITHUB_OUTPUT
+          echo "Terraform Outputs:"
+          echo "$OUTPUT_JSON" | jq .
+        env:
+          TF_CLI_CONFIG_FILE: $HOME/.terraform.d/terraform.rc
+      
+      - name: Upload Terraform State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state
+          path: |
+            ${{ inputs.working_directory }}/terraform.tfstate
+            ${{ inputs.working_directory }}/tfplan
+          retention-days: 30
+      
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Plan 📖
+            
+            \`\`\`
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })

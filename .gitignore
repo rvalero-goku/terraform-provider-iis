@@ -1,8 +1,68 @@
+# Logs
 *.log
+logs/
+
+# local dev
+
+*.ps1
+MAKEFILE
+# Terraform files
 *.tfstate
+*.tfstate.*
 *.tfstate.backup
-.terraform
+.terraform/
+.terraform.lock.hcl
+terraform.rc
+.terraformrc
 *.tfvars
-terraform-provider-iis
-.idea
+*.tfvars.json
+*tfplan*
+
+# Terraform override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Provider binaries and build artifacts
+bin/
+*.exe
+terraform-provider-*
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE files
+.idea/
 *.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+
+# Crash logs
+crash.log
+crash.*.log

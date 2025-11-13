@@ -1,0 +1,175 @@
+name: Test IIS Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_yaml:
+        description: 'IIS configuration YAML content (leave empty to use iis-config-example.yaml)'
+        required: false
+        type: string
+      auto_approve:
+        description: 'Auto approve the Terraform apply'
+        required: true
+        type: boolean
+        default: false
+      destroy:
+        description: 'Destroy infrastructure'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test-deploy:
+    name: Test IIS Deployment
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+      
+      - name: Build IIS Provider
+        run: |
+          echo "Building IIS Terraform Provider..."
+          go build -o terraform-provider-iis_v0.1.0
+          chmod +x terraform-provider-iis_v0.1.0
+          
+          # Create provider directory structure
+          PROVIDER_DIR="$HOME/.terraform.d/plugins/terraform.local/maxjoehnk/iis/0.1.0/linux_amd64"
+          mkdir -p "$PROVIDER_DIR"
+          
+          # Copy provider binary to plugin directory
+          cp terraform-provider-iis_v0.1.0 "$PROVIDER_DIR/"
+          
+          echo "Provider built and installed to: $PROVIDER_DIR"
+          ls -la "$PROVIDER_DIR"
+      
+      - name: Setup Terraform CLI Config
+        run: |
+          # Create Terraform CLI config with dev overrides
+          mkdir -p $HOME/.terraform.d
+          cat > $HOME/.terraform.d/terraform.rc << 'EOF'
+          provider_installation {
+            dev_overrides {
+              "terraform.local/maxjoehnk/iis" = "$HOME/.terraform.d/plugins/terraform.local/maxjoehnk/iis/0.1.0/linux_amd64"
+            }
+            direct {
+              exclude = ["terraform.local/*/*"]
+            }
+          }
+          EOF
+          
+          # Expand HOME variable
+          sed -i "s|\$HOME|$HOME|g" $HOME/.terraform.d/terraform.rc
+          
+          echo "Terraform CLI config created:"
+          cat $HOME/.terraform.d/terraform.rc
+      
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 'latest'
+          tofu_wrapper: false
+      
+      - name: Prepare Terraform Configuration
+        run: |
+          cd examples
+          
+          # If custom YAML provided, use it; otherwise use iis-config-example.yaml
+          if [ -n "${{ inputs.config_yaml }}" ]; then
+            echo "Using custom YAML configuration..."
+            cat > iis-config.yaml << 'EOFYAML'
+          ${{ inputs.config_yaml }}
+          EOFYAML
+            
+            # Update main.tf to use iis-config.yaml
+            sed -i 's/iis-config-example\.yaml/iis-config.yaml/g' main.tf
+          else
+            echo "Using iis-config-example.yaml..."
+            # Ensure main.tf uses iis-config-example.yaml
+            sed -i 's/iis-config\.yaml/iis-config-example.yaml/g' main.tf
+          fi
+          
+          echo "Configuration files:"
+          ls -la
+      
+      - name: Terraform Init
+        working-directory: ./examples
+        run: |
+          tofu init -upgrade
+        env:
+          TF_CLI_CONFIG_FILE: ~/.terraform.d/terraform.rc
+      
+      - name: Terraform Validate
+        working-directory: ./examples
+        run: tofu validate -no-color
+        env:
+          TF_CLI_CONFIG_FILE: ~/.terraform.d/terraform.rc
+      
+      - name: Terraform Plan
+        id: plan
+        working-directory: ./examples
+        run: |
+          if [ "${{ inputs.destroy }}" = "true" ]; then
+            tofu plan -destroy -no-color -out=tfplan
+          else
+            tofu plan -no-color -out=tfplan
+          fi
+        env:
+          TF_CLI_CONFIG_FILE: ~/.terraform.d/terraform.rc
+        continue-on-error: true
+      
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      
+      - name: Terraform Apply
+        id: apply
+        if: inputs.auto_approve == true
+        working-directory: ./examples
+        run: |
+          tofu apply -auto-approve tfplan
+        env:
+          TF_CLI_CONFIG_FILE: ~/.terraform.d/terraform.rc
+      
+      - name: Terraform Output
+        id: output
+        if: steps.apply.outcome == 'success' && inputs.destroy == false
+        working-directory: ./examples
+        run: |
+          echo "### Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          tofu output -json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+          # Also output to console
+          echo "Terraform Outputs:"
+          tofu output -json | jq .
+        env:
+          TF_CLI_CONFIG_FILE: ~/.terraform.d/terraform.rc
+      
+      - name: Upload Terraform State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state-${{ github.run_number }}
+          path: |
+            examples/terraform.tfstate
+            examples/tfplan
+          retention-days: 30
+      
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.apply.outcome || 'Planned only' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action**: ${{ inputs.destroy && 'Destroy' || 'Apply' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto Approved**: ${{ inputs.auto_approve }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
