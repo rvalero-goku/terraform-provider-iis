@@ -103,7 +103,12 @@ func resourceWebsiteRead(ctx context.Context, d *schema.ResourceData, m interfac
 	client := m.(*iis.Client)
 	site, err := client.ReadWebsite(ctx, d.Id())
 	if err != nil {
-		d.SetId("")
+		// If resource was manually deleted (404), remove from state
+		if iis.IsNotFoundError(err) {
+			tflog.Warn(ctx, "Website not found, removing from state: "+d.Id())
+			d.SetId("")
+			return nil
+		}
 		return diag.FromErr(err)
 	}
 	tflog.Debug(ctx, "Read website:"+toJSON(site))

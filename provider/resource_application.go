@@ -63,7 +63,12 @@ func resourceApplicationRead(ctx context.Context, d *schema.ResourceData, m inte
 	client := m.(*iis.Client)
 	application, err := client.ReadApplication(ctx, d.Id())
 	if err != nil {
-		d.SetId("")
+		// If resource was manually deleted (404), remove from state
+		if iis.IsNotFoundError(err) {
+			tflog.Warn(ctx, "Application not found, removing from state: "+d.Id())
+			d.SetId("")
+			return nil
+		}
 		return diag.FromErr(err)
 	}
 	tflog.Debug(ctx, "Read application: "+toJSON(application))

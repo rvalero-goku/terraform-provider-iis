@@ -3,20 +3,20 @@
 
 servers:
   server1:
-    host: "https://hostname1:55539"
+    host: "https://romantic-horse.projectpulse.me:55539"
     enabled: true
     # NTLM authentication (provider auto-generates API tokens)
     ntlm_username: "azureuser"
-    ntlm_password: "password"
+    ntlm_password: "PM5631r:Tfdn[*]5A5_H+xq]"
     # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
     
   server2:
-    host: "https://hostname2:55540"
+    host: "https://romantic-horse.projectpulse.me:55540"
     enabled: true
     # NTLM authentication (provider auto-generates API tokens)
     ntlm_username: "azureuser"
-    ntlm_password: "password"
+    ntlm_password: "PM5631r:Tfdn[*]5A5_H+xq]"
     # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
 
@@ -59,8 +59,8 @@ websites:
       - protocol: "https"
         port: 443
         ip_address: "*"
-        hostname: "hostname"
-        certificate_cn: "hostname"  # Certificate Common Name (without CN= prefix)
+        hostname: "romantic-horse.projectpulse.me"
+        certificate_cn: "romantic-horse.projectpulse.me"  # Certificate Common Name (without CN= prefix)
       # - protocol: "https"
       #   port: 444
       #   ip_address: "*"

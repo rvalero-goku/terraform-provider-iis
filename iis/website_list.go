@@ -27,3 +27,20 @@ func (client Client) ListWebsites(ctx context.Context) ([]WebsiteListItem, error
 	}
 	return res.Websites, nil
 }
+
+// GetWebsiteByName retrieves a website by name from the list of all websites
+func (client Client) GetWebsiteByName(ctx context.Context, name string) (*Website, error) {
+	websites, err := client.ListWebsites(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	for _, site := range websites {
+		if site.Name == name {
+			// Get full website details by ID
+			return client.ReadWebsite(ctx, site.ID)
+		}
+	}
+	
+	return nil, nil
+}
