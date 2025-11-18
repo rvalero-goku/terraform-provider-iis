@@ -3,20 +3,20 @@
 
 servers:
   server1:
-    host: "https://projectname.projectpulse.me:55539"
+    host: "https://hostname1:55539"
     enabled: true
     # NTLM authentication (provider auto-generates API tokens)
     ntlm_username: "azureuser"
-    ntlm_password: "0Go+j5}mdhn(_Ea?945wLrPX"
+    ntlm_password: "password"
     # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
     
   server2:
-    host: "https://projectname.projectpulse.me:55540"
+    host: "https://hostname2:55540"
     enabled: true
     # NTLM authentication (provider auto-generates API tokens)
     ntlm_username: "azureuser"
-    ntlm_password: "0Go+j5}mdhn(_Ea?945wLrPX"
+    ntlm_password: "password"
     # ntlm_domain: ""  # Optional, leave empty for local accounts
     insecure: true
 
@@ -51,7 +51,7 @@ websites:
       - protocol: "http"
         port: 80
         ip_address: "*"
-        hostname: "projectname.projectpulse.me"
+        hostname: "hostname"
       # - protocol: "http"
       #   port: 80
       #   ip_address: "*"
@@ -59,13 +59,13 @@ websites:
       - protocol: "https"
         port: 443
         ip_address: "*"
-        hostname: "projectname.projectpulse.me"
-        certificate_cn: "projectname.projectpulse.me"  # Certificate Common Name (without CN= prefix)
+        hostname: "hostname"
+        certificate_cn: "hostname"  # Certificate Common Name (without CN= prefix)
       # - protocol: "https"
       #   port: 444
       #   ip_address: "*"
       #   hostname: ""
-      #   certificate_cn: "projectname.projectpulse.me"  # Certificate Common Name (without CN= prefix)
+      #   certificate_cn: "hostname"  # Certificate Common Name (without CN= prefix)
 
 
 # Directories - deployed to all enabled servers
