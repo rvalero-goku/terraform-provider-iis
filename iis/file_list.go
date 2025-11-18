@@ -32,3 +32,19 @@ func (client Client) ListWebServerFiles(ctx context.Context, websiteID string) (
 	}
 	return res.Files, nil
 }
+
+// GetFileByName retrieves a file/directory by name from a parent directory
+func (client Client) GetFileByName(ctx context.Context, name string, parentID string) (*File, error) {
+	files, err := client.ListFiles(ctx, parentID)
+	if err != nil {
+		return nil, err
+	}
+	
+	for _, file := range files {
+		if file.Name == name {
+			return &file, nil
+		}
+	}
+	
+	return nil, nil
+}

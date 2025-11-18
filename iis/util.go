@@ -191,3 +191,19 @@ func guardStatusCode(method string, url *url.URL, response *http.Response) error
 	}
 	return nil
 }
+
+// IsConflictError checks if an error is a 409 Conflict error
+func IsConflictError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return bytes.Contains([]byte(err.Error()), []byte("409 Conflict"))
+}
+
+// IsNotFoundError checks if an error is a 404 Not Found error
+func IsNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return bytes.Contains([]byte(err.Error()), []byte("404 Not Found"))
+}

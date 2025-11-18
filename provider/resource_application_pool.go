@@ -73,7 +73,12 @@ func resourceApplicationPoolRead(ctx context.Context, d *schema.ResourceData, m 
 	id := d.Id()
 	appPool, err := client.ReadAppPool(ctx, id)
 	if err != nil {
-		d.SetId("")
+		// If resource was manually deleted (404), remove from state
+		if iis.IsNotFoundError(err) {
+			tflog.Warn(ctx, "Application pool not found, removing from state: "+id)
+			d.SetId("")
+			return nil
+		}
 		return diag.FromErr(err)
 	}
 	tflog.Debug(ctx, "Read application pool: "+toJSON(appPool))

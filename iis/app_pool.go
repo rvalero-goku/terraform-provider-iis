@@ -103,6 +103,26 @@ func (client Client) ReadAppPool(ctx context.Context, id string) (*ApplicationPo
 	return &appPool, nil
 }
 
+// GetAppPoolByName retrieves an application pool by name from the list of all pools
+func (client Client) GetAppPoolByName(ctx context.Context, name string) (*ApplicationPool, error) {
+	var response struct {
+		AppPools []ApplicationPool `json:"app_pools"`
+	}
+	if err := getJson(ctx, client, "/api/webserver/application-pools", &response); err != nil {
+		return nil, err
+	}
+	
+	for _, pool := range response.AppPools {
+		if pool.Name == name {
+			// Return the pool we found in the list
+			// It has limited fields, so fetch the full details
+			return client.ReadAppPool(ctx, pool.ID)
+		}
+	}
+	
+	return nil, fmt.Errorf("application pool '%s' not found", name)
+}
+
 func (client Client) DeleteAppPool(ctx context.Context, id string) error {
 	url := fmt.Sprintf("/api/webserver/application-pools/%s", id)
 	return httpDelete(ctx, client, url)
