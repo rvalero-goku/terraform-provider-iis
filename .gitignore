@@ -2,10 +2,7 @@
 *.log
 logs/
 
-# local dev
 
-*.ps1
-MAKEFILE
 # Terraform files
 *.tfstate
 *.tfstate.*
@@ -25,9 +22,6 @@ override.tf.json
 *_override.tf.json
 
 # Provider binaries and build artifacts
-bin/
-*.exe
-terraform-provider-*
 *.so
 *.dylib
 *.test
